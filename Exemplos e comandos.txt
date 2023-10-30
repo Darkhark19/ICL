@@ -1,0 +1,19 @@
+{let mut n = 2; while !n < 5 { n := !n + 1; if (~( !n<=1)) {println("Erro")}{println("END")}}};;
+
+{let MAX=2; let mut x=MAX; let mut s=1; while !x>0 { if (!s > 10) {s := !s + !x} { s := !s * !x}; x := !x – 1 }; println !s};;
+
+{let MAX=10; let mut x=MAX; let mut s=0; while !x>0 { s := !s + !x; x := !x – 1 }; println !s};;
+
+{let m = new 5666; while !m > 1 { if (2*(!m / 2) == !m) {m := !m / 2} {m:= 3*!m+1 };println !m}};;
+
+{let mut m = false; let x = new true; if !m {println ("ICL")} { m := !x}; println ~(!m)};;
+
+
+Para correr o compiler e jasmin
+
+makeitCompiler.bat 
+java Header
+
+Para correr o interpretador 
+
+makeitInterpreter.bat

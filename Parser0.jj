@@ -1,0 +1,262 @@
+PARSER_BEGIN(Parser)
+
+/** ID lister. */
+public class Parser {
+}
+
+PARSER_END(Parser)
+
+SKIP :
+{
+  " "
+| "\t"
+| "\r"
+| "\n"
+}
+
+TOKEN :
+{
+  < TRUE : "true">
+  |
+  < FALSE : "false">
+  |
+  < IF : "if">
+  |
+  < THEN : "then">
+  |
+  < ELSE : "else">
+  |
+  < WHILE : "while">
+  |
+  < DEREF : "!">
+  |
+  < DO : "do">
+  |
+  < MUT : "mut ">
+  |
+  < PRINT :"println">
+  |
+  < NEW : "new">
+  |
+  < LET: "let">
+  |
+  <FN : "fn">
+  |
+  < Id: ["a"-"z","A"-"Z"] ( ["a"-"z","A"-"Z","0"-"9"] )* >
+  |
+  < Num: (["0"-"9"]) + >
+  |
+  < PLUS : "+" >
+  |
+  < MINUS : "-">
+  |
+  < TIMES : "*">
+  |
+  < DIV : "/">
+  |
+  < LPAR : "(" >
+  |
+  < RPAR : ")" >
+  |
+  < LBREACE: "{" >
+  |
+  < RBREACE: "}">
+  |
+  < EQUALS: "=" >
+  |
+  < SEMICOLON: ";">
+  |
+  < ASSIGN : ":=">
+  |
+  < COMP : "==">
+  |
+  < GREATER : ">">
+  |
+  < GREATEREQUALS : ">=">
+  |
+  < LESS : "<">
+  |
+  < LESSEQUALS : "<=">
+  |
+  < NOTEQUALS : "~=">
+  |
+  < AND : "&&">
+  |
+  < OR : "||">
+  |
+  < NOT : "~">
+  |
+  < ENDBLOCK : ";;">
+  |
+  <STRING: "\"" (["a"-"z","A"-"Z","0"-"9"," ",".","!","?","@","#","$","%","^","&","*","(",")","-","_","+","=","{","}","[","]",";",":","<",">",",","/","\\","|","`","~"]) + "\"">
+}
+
+ASTNode Start():
+{ ASTNode t; }
+{
+   t = Sequence() <ENDBLOCK>
+   { return t; }
+}
+
+ASTNode Sequence():
+{ ASTNode t, t1; }
+{
+   t = Assign() (<SEMICOLON> t1 = Assign(){ t = new ASTSenquence(t,t1);})* 
+   { return t; }
+}
+
+ASTNode Assign():
+{
+  ASTNode t,t1;}
+{
+  t = BoolA() (<ASSIGN> t1 = BoolA()
+  {
+    t= new ASTAssign(t,t1);
+  } )*
+  {return t;}
+  
+}
+ASTNode BoolA():
+{
+  ASTNode t,t1;
+}
+{
+  t = BoolM() (<OR> t1 = BoolM()
+  {
+    t= new ASTOr(t,t1);
+  })*
+  {return t;}
+  
+}
+ASTNode BoolM():
+{
+  ASTNode t,t1;
+}
+{
+  t = Relops() (<AND> t1 = Relops()
+  {
+    t= new ASTAnd(t,t1);
+  })*
+  {return t;}
+}
+
+ASTNode Relops():
+{
+  Token op;
+  ASTNode t,t1;
+}
+{
+  t = Exp() (( op = <COMP>| op =<GREATER> | op =<GREATEREQUALS> 
+     | op= <LESS>| op = <LESSEQUALS>| op = <NOTEQUALS> ) t1 = Exp()
+     {
+        switch (op.kind) {
+          case COMP:
+            t = new ASTEquals(t,t1,true);
+            break;
+          case GREATER:
+            t = new ASTGreater(t,t1 ,false,true);
+            break;
+          case GREATEREQUALS:
+            t = new ASTGreater(t,t1 ,true,true);
+            break;
+          case LESS:
+            t = new ASTGreater(t,t1 ,false,false);
+            break;
+          case LESSEQUALS:
+            t = new ASTGreater(t,t1 ,true,false);
+            break;
+          case NOTEQUALS:
+          t = new ASTEquals(t,t1,false);
+            break;
+          default:
+            break;
+        }
+     })?
+  {
+    return t;
+  }
+}
+
+ASTNode Exp() :
+{ Token op;
+  ASTNode t1, t2; }
+{
+     t1=Term() ( ( op=<PLUS> | op=<MINUS> ) t2=Term() 
+                 { if (op.kind == PLUS) 
+                         t1 = new ASTPlus(t1,t2);
+                   else  t1 = new ASTSub(t1,t2);
+                 } 
+               ) *
+     { return t1; } 
+}
+
+ASTNode Term() :
+{Token op;
+  ASTNode t1, t2;}
+{
+     t1 = Fact() ( ( op=<TIMES> | op=<DIV>) t2 = Fact() 
+                    { if (op.kind == TIMES) 
+                            t1 = new ASTTimes(t1,t2);
+                      else t1 = new ASTDiv(t1,t2);
+                    } )*
+     { return t1; } 
+}
+
+
+ASTNode Fact() :
+{ Token n; 
+  ASTNode t,t1,t2;}
+{
+   ( n=<Num> { t = new ASTNum(Integer.parseInt(n.image)); } 
+    | <TRUE> {t = new ASTBool(true) ;}
+    | <FALSE> {t = new ASTBool(false) ;}
+    | n=<Id> { t = new ASTId(n.image); }
+    | n = <STRING> {t = new ASTString(n.image);}
+    | <NOT> t=Exp() {t = new ASTNot(t);}//feito
+    | <LPAR> t=BoolA() <RPAR> //feito
+    | n=<MINUS> { t = Neg(); } //feito
+    | <LBREACE> {t = Def() ;} <RBREACE> //feito
+    | <NEW> t = BoolA() {t = new ASTNew(t);} //feito
+    | <DEREF> t = Fact() {t = new ASTDeref(t);}
+    | <IF> t = If() //feito 
+    | <PRINT> t = BoolA() {t = new ASTPrintln(t);} //feito
+    | <WHILE> t = BoolA() <LBREACE> t1 = Def() <RBREACE> {t = new ASTWhile(t,t1);}
+    )
+   { return t; }
+}
+ASTNode If() :
+{
+  ASTNode t,t1,t2;
+}{
+  (t = BoolA() <LBREACE> t1 = Sequence() <RBREACE> <LBREACE> t2 = Sequence()<RBREACE>)
+  {return new ASTIf(t,t1,t2);}
+}
+ASTNode Neg() :
+{
+  ASTNode t;}
+{
+  t = Exp()
+  {
+    t = new ASTNeg(t);
+    return t;
+  }
+}
+
+ASTNode Def() :
+{
+  Token id,op = null;
+  ASTNode t1,t2;
+ }
+{
+  {java.util.List<Pair>	l	=	new	java.util.LinkedList();}
+  
+  (<LET>  (op=<MUT>)? id=<Id> <EQUALS> t1=BoolA() <SEMICOLON>{
+    if(op!=null)
+      t1 = new ASTNew(t1);
+      op = null;
+    } 
+    { l.add(new Pair(id.image,t1));}
+    )* t2 = Sequence()
+
+  {return new ASTDef(l,t2);}
+}
